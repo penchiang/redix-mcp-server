@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "redix-anytoany": {
+      "command": "python3.11",
+      "args": ["server.py"],
+      "cwd": "/opt/MCP/redix-mcp-server",
+      "env": {
+        "REDIX_API_BASE": "http://localhost:8080",
+        "REDIX_API_KEY": "demo-key-12345"
+      }
+    }
+  }
+}
