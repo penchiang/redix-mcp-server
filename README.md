@@ -19,13 +19,47 @@ MCP server that exposes the Redix AnyToAny healthcare data conversion engine to 
 | `generate_claim_pdf` | X12 837 → PDF (CMS-1500/UB-04/ADA) | Gate 1 (input) |
 | `list_supported_formats` | Capability discovery | — |
 
-## Setup
+## Quick Start — Remote (Hosted)
+
+Connect to the hosted demo server — no installation required.
+
+### Streamable HTTP (recommended)
+
+```json
+{
+  "mcpServers": {
+    "redix-anytoany": {
+      "url": "https://demo.redix.com/mcp",
+      "env": {
+        "REDIX_API_KEY": "demo-key-12345"
+      }
+    }
+  }
+}
+```
+
+### SSE
+
+```json
+{
+  "mcpServers": {
+    "redix-anytoany": {
+      "url": "https://demo.redix.com/sse",
+      "env": {
+        "REDIX_API_KEY": "demo-key-12345"
+      }
+    }
+  }
+}
+```
+
+## Setup — Local (Self-Hosted)
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Environment Variables
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -34,21 +68,27 @@ pip install -r requirements.txt
 | `REQUEST_TIMEOUT` | `120` | HTTP timeout in seconds |
 | `LOG_LEVEL` | `INFO` | Python logging level |
 
-## Running
+### Running Locally
 
-### STDIO mode (Claude Desktop / Claude Code)
+#### STDIO mode (Claude Desktop / Claude Code)
 
 ```bash
 python3.11 server.py
 ```
 
-### HTTP/SSE mode (multi-client)
+#### Streamable HTTP mode (multi-client)
+
+```bash
+fastmcp run server.py --transport streamable-http --port 8000
+```
+
+#### SSE mode (multi-client)
 
 ```bash
 fastmcp run server.py --transport sse --port 8000
 ```
 
-### MCP Inspector
+#### MCP Inspector
 
 ```bash
 fastmcp dev server.py
