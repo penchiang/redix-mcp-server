@@ -29,7 +29,6 @@ from server import (
     generate_x12_from_database as _generate_x12_from_database,
     convert_hl7_to_fhir as _convert_hl7_to_fhir,
     convert_cda_to_fhir as _convert_cda_to_fhir,
-    convert_fhir_to_x12 as _convert_fhir_to_x12,
     convert_fhir_to_rmap as _convert_fhir_to_rmap,
     generate_claim_pdf as _generate_claim_pdf,
     list_supported_formats as _list_supported_formats,
@@ -44,7 +43,6 @@ convert_x12_to_database = _convert_x12_to_database.fn
 generate_x12_from_database = _generate_x12_from_database.fn
 convert_hl7_to_fhir = _convert_hl7_to_fhir.fn
 convert_cda_to_fhir = _convert_cda_to_fhir.fn
-convert_fhir_to_x12 = _convert_fhir_to_x12.fn
 convert_fhir_to_rmap = _convert_fhir_to_rmap.fn
 generate_claim_pdf = _generate_claim_pdf.fn
 list_supported_formats = _list_supported_formats.fn

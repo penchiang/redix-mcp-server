@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 
 from api_client import RedixAPIClient
-from response import build_response
+from response import build_response, eval_key_doorway
 
 logger = logging.getLogger("redix-mcp")
 
@@ -41,6 +41,9 @@ async def gate1_input_validation(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=(
@@ -121,6 +124,9 @@ async def gate5_output_validation(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=(

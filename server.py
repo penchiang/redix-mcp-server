@@ -3,6 +3,13 @@
 Exposes the Redix AnyToAny REST API to AI agents via the Model Context
 Protocol.  Each tool is a thin wrapper: validate → convert → re-validate.
 
+Reverse FHIR-to-X12 (278) is intentionally NOT exposed here. It remains
+available via the REST API under private technical review: external,
+provider-generated PAS bundles do not yet ingest cleanly end-to-end
+(round-trip on Redix-generated bundles is fine), so it is unfit for an
+unattended sandbox where a failure reads as a Redix defect. See
+convert_fhir_to_rmap for inspecting the intermediate mapping.
+
 Run:
     python server.py              # STDIO mode (Claude Desktop / Claude Code)
     fastmcp run server.py --transport sse --port 8000   # HTTP/SSE mode
@@ -17,7 +24,7 @@ from fastmcp import FastMCP
 from api_client import RedixAPIClient
 from config import LOG_LEVEL
 from gates import gate1_input_validation, gate5_output_validation
-from response import build_response
+from response import build_response, eval_key_doorway
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -116,6 +123,9 @@ async def validate_x12(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"Validation service error: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -368,6 +378,9 @@ async def convert_rmap_to_x12(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"RMap-to-X12 conversion failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -533,6 +546,9 @@ async def generate_x12_from_database(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"Database-to-X12 generation failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -600,6 +616,9 @@ async def convert_hl7_to_fhir(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"HL7-to-FHIR conversion failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -663,6 +682,9 @@ async def convert_cda_to_fhir(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"CDA-to-FHIR conversion failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -695,84 +717,17 @@ async def convert_cda_to_fhir(
 
 
 # ===================================================================
-# Tool 9: convert_fhir_to_x12
+# convert_fhir_to_x12 — REMOVED from the MCP sandbox 2026-06-24.
+# Reverse FHIR-to-X12 (278) stays in the REST API under private technical
+# review. External, provider-generated PAS bundles do not yet ingest cleanly
+# end-to-end (RMap-to-X12 DX0/TA0 gaps); exposing it in an unattended sandbox
+# made every external failure read as a Redix defect. convert_fhir_to_rmap
+# (below) remains for inspecting the intermediate mapping.
 # ===================================================================
-
-@mcp.tool()
-async def convert_fhir_to_x12(
-    fhir_bundle: str,
-) -> dict:
-    """Convert a FHIR R4 Bundle to HIPAA X12 EDI (278 Prior Authorization).
-
-    Accepts a FHIR Bundle containing a Claim resource with
-    use="preauthorization" (278 Request) or a ClaimResponse (278 Response).
-    The FHIR content must follow the Da Vinci PAS profile.
-
-    Gate 5 (output validation) is applied — the generated X12 is
-    re-validated. BLOCKS if the output fails validation.
-
-    Args:
-        fhir_bundle: FHIR R4 Bundle as a JSON string. Must contain a
-            Claim (preauthorization) or ClaimResponse resource.
-
-    Returns:
-        dict with status, redix_ruling, and X12 278 content.
-    """
-    try:
-        bundle_obj = json.loads(fhir_bundle) if isinstance(fhir_bundle, str) else fhir_bundle
-    except json.JSONDecodeError as exc:
-        return build_response(
-            status="ERROR",
-            ruling=f"Invalid JSON in fhir_bundle: {exc}",
-        )
-
-    result = await client.post_json(
-        "/api/v2/fhir-to-hipaa/convert",
-        json_body=bundle_obj,
-        params={"output_format": "x12"},
-    )
-
-    if result.get("_error"):
-        return build_response(
-            status="ERROR",
-            ruling=f"FHIR-to-X12 conversion failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
-        )
-
-    x12_output = result.get("x12_output", "")
-    if not x12_output:
-        return build_response(
-            status="ERROR",
-            ruling="FHIR-to-X12 conversion returned empty X12 content.",
-            data=result,
-        )
-
-    # Gate 5: re-validate generated X12
-    gate5 = await gate5_output_validation(client, x12_output, "278", "convert_fhir_to_x12")
-    if gate5:
-        gate5["data"]["x12_content"] = x12_output
-        return gate5
-
-    warnings = result.get("warnings", [])
-    status = "APPROVED_WITH_CONDITIONS" if warnings else "APPROVED"
-    conv_type = result.get("conversion_type", "278")
-
-    return build_response(
-        status=status,
-        ruling=(
-            f"FHIR Bundle converted to X12 {conv_type} and passed output validation."
-            + (f" {len(warnings)} warning(s)." if warnings else "")
-        ),
-        data={
-            "x12_content": x12_output,
-            "conversion_type": conv_type,
-            "metadata": result.get("metadata"),
-        },
-        warnings=warnings,
-    )
 
 
 # ===================================================================
-# Tool 10: convert_fhir_to_rmap
+# Tool: convert_fhir_to_rmap
 # ===================================================================
 
 @mcp.tool()
@@ -811,6 +766,9 @@ async def convert_fhir_to_rmap(
     )
 
     if result.get("_error"):
+        door = eval_key_doorway(result)
+        if door:
+            return door
         return build_response(
             status="ERROR",
             ruling=f"FHIR-to-RMap conversion failed: HTTP {result.get('_status_code')}. {result.get('_detail', '')[:300]}",
@@ -863,8 +821,10 @@ async def generate_claim_pdf(
     Returns:
         dict with status, redix_ruling, PDF download URLs, and metadata.
     """
-    # Determine transaction type for validation
-    tx_type = claim_type if claim_type != "auto" else "837p"
+    # Determine transaction type for validation. When claim_type is "auto",
+    # pass None so Gate 1 auto-detects (an 837I/837D must not be validated as
+    # 837P); the claims-to-PDF endpoint auto-detects the form either way.
+    tx_type = claim_type if claim_type != "auto" else None
     blocked = await gate1_input_validation(client, x12_837_content, tx_type, strict_mode)
     if blocked:
         return blocked
